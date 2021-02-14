@@ -1,0 +1,104 @@
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include "OneWire.h"
+#include "DallasTemperature.h"
+#include <driver/adc.h>
+#define M 34
+#define RL 47  //The value of resistor RL is 47K
+#define m -0.263 //Enter calculated Slope 
+#define b 0.42 //Enter calculated intercept
+#define Ro 20 //Enter found Ro value
+#define MQ_sensor 35 //Sensor is connected to A4
+  
+const char* ssid     = "fireworks";    // 와이파이 SSID
+const char* password = "fireworks!";      // 와이파이 비밀번호
+
+String jsondata= ""; 
+
+void postjson(){
+
+HTTPClient client;
+ 
+   client.begin("http://192.168.0.5:3000/postinfo");        // 서버 주소
+   client.addHeader("Content-Type", "application/json");
+   int httpResponseCode = client.POST(jsondata);
+}
+void setup()
+{
+    Serial.begin(115200);
+    delay(10);
+    
+    Serial.println();
+    Serial.println();
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
+ 
+    WiFi.begin(ssid, password);
+  Serial.begin(115200);
+
+ 
+    // 와이파이망에 연결
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+ 
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());  
+
+}
+
+
+
+void Jsonin(){
+  int value = analogRead(M);  //MQ-4의 Aout 값 입력
+  float Mppm = analogRead(M);
+  float VRL;
+  float Rs; //Sensor resistance at gas concentration 
+  float ratio; //Define variable for ratio
+  VRL = analogRead(MQ_sensor)*(5.0/1023.0); //Measure the voltage drop and convert to 0-5V
+  Rs = ((5.0*RL)/VRL)-RL; //Use formula to get Rs value
+  ratio = Rs/Ro; 
+  StaticJsonDocument<250> doc;
+  JsonObject root = doc.to<JsonObject>();
+  float ppm = pow(10,((log10(ratio)-b)/m));
+  root["VRL"] = VRL;
+  root["ppm"] = ppm;
+  root["Mppm"] = Mppm;
+  
+   serializeJsonPretty(root,jsondata);
+
+}
+
+void loop()
+{
+   int value = analogRead(M);  //MQ-4의 Aout 값 입력
+   int Mppm;
+   Serial.print("Mppm : ");
+   Serial.println(value);     //시리얼창에 아날로그값 출력
+  float VRL; //Voltage drop across the MQ sensor
+  float Rs; //Sensor resistance at gas concentration 
+  float ratio; //Define variable for ratio
+   
+  VRL = analogRead(MQ_sensor)*(5.0/1023.0); //Measure the voltage drop and convert to 0-5V
+  Rs = ((5.0*RL)/VRL)-RL; //Use formula to get Rs value
+  ratio = Rs/Ro;  // find ratio Rs/Ro
+ 
+  float ppm = pow(10, ((log10(ratio)-b)/m)); //use formula to calculate ppm
+
+  Serial.print(ppm);
+  Serial.print(" ppm,");
+  Serial.print(VRL);
+  Serial.println(" v");
+
+  delay(1000);
+ 
+ jsondata= "";
+ Jsonin();
+ postjson();
+Serial.println(jsondata);
+delay(500);
+
+}
