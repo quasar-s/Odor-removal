@@ -85,6 +85,6 @@ void loop(void)
      
   //센서에서 읽어온 온도를 출력  
   printTemperature(insideThermometer);  
-
+ 
   delay(1000);
 }  
